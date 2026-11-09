@@ -1,0 +1,31 @@
+{
+  "default_profile": "general",
+  "profiles": {
+    "general": {
+      "style": "documentary",
+      "layout": "stack-left",
+      "lang": "en",
+      "note": "Works for any channel. Explicit flags always override profile defaults."
+    },
+    "podcast": {
+      "style": "podcast",
+      "layout": "bottom-left",
+      "lang": "en"
+    },
+    "gaming": {
+      "style": "boldred",
+      "layout": "stack-left",
+      "lang": "en"
+    },
+    "travel": {
+      "style": "documentary",
+      "layout": "center-big",
+      "lang": "en"
+    },
+    "hindi-explainer": {
+      "style": "tech",
+      "layout": "bottom-left",
+      "lang": "hi"
+    }
+  }
+}
