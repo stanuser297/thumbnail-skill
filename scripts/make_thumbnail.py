@@ -115,14 +115,43 @@ def stroke_kw(im, style, size, framed):
     return {"stroke_width": max(2, size // 36), "stroke_fill": hx(style["bg"])}
 
 
-def draw_bottom_left(im, title, accent, style, label, lang, framed):
+def paste_subject(im, subject_path, side="right"):
+    """Composite a cut-out subject (RGBA PNG) with outline + drop shadow.
+    Returns the width the subject occupies, so text can avoid it."""
+    subj = Image.open(subject_path).convert("RGBA")
+    scale = (H * 0.92) / subj.height
+    if subj.width * scale > W * 0.5:
+        scale = (W * 0.5) / subj.width
+    subj = subj.resize((round(subj.width * scale), round(subj.height * scale)))
+    sw, sh = subj.size
+    x = W - sw - 24 if side == "right" else 24
+    y = H - sh
+    alpha = subj.split()[3]
+    # soft drop shadow
+    sh_mask = alpha.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(16))
+    shadow = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    shadow.paste(Image.new("RGBA", subj.size, (0, 0, 0, 150)), (x + 10, y + 12), sh_mask)
+    # white pop outline
+    ol_mask = alpha.filter(ImageFilter.MaxFilter(15)).filter(ImageFilter.GaussianBlur(1.5))
+    outline = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    outline.paste(Image.new("RGBA", subj.size, (255, 255, 255, 235)), (x, y), ol_mask)
+    base = im.convert("RGBA")
+    base = Image.alpha_composite(base, shadow)
+    base = Image.alpha_composite(base, outline)
+    base.paste(subj, (x, y), subj)
+    out = base.convert("RGB")
+    im.paste(out, (0, 0))
+    return sw + 24
+
+
+def draw_bottom_left(im, title, accent, style, label, lang, framed, text_w=None):
     d = ImageDraw.Draw(im)
     pad = 72
     words = title.split()
     acc = accent.upper() if accent else None
     parts = [(w, "accent" if acc and w.upper() == acc else "text") for w in words]
     line = " ".join(w for w, _ in parts)
-    font, size = fit_font(line, lang, W - 2 * pad, 150)
+    font, size = fit_font(line, lang, text_w or (W - 2 * pad), 150)
     if size < STYLES["rules"]["min_title_px"]:
         print(f"warning: title size {size}px under mobile-readable minimum; shorten text")
     block_h = size + (70 if label else 0)
@@ -149,13 +178,13 @@ def draw_bottom_left(im, title, accent, style, label, lang, framed):
                     fill=hx(style["accent"]))
 
 
-def draw_stack_left(im, title, accent, style, label, lang, framed):
+def draw_stack_left(im, title, accent, style, label, lang, framed, text_w=None):
     """One word per line on the left; accent word sits on a highlight bar."""
     d = ImageDraw.Draw(im)
     pad = 72
     words = title.split()
     acc = accent.upper() if accent else None
-    max_w = (W - 2 * pad) * 3 // 4
+    max_w = text_w or ((W - 2 * pad) * 3 // 4)
     # fit by width, then shrink until the whole stack also fits vertically
     size = 170
     while True:
@@ -187,7 +216,7 @@ def draw_stack_left(im, title, accent, style, label, lang, framed):
         y += step
 
 
-def draw_center_big(im, title, accent, style, label, lang, framed):
+def draw_center_big(im, title, accent, style, label, lang, framed, text_w=None):
     """Huge centred title with a small kicker above (travel/destination style)."""
     d = ImageDraw.Draw(im)
     words = title.split()
@@ -220,7 +249,7 @@ def draw_center_big(im, title, accent, style, label, lang, framed):
                     fill=hx(style["accent"]))
 
 
-def draw_split(im, title, accent, style, label, lang, framed):
+def draw_split(im, title, accent, style, label, lang, framed, text_w=None):
     """Small caps labels on each half; title on a dark bar at the bottom."""
     d = ImageDraw.Draw(im)
     half = W // 2
@@ -267,8 +296,20 @@ LAYOUTS = {
 
 
 def render(title, accent, style_name, label=None, lang="en", frame=None,
-           layout="bottom-left", frame2=None):
+           layout="bottom-left", frame2=None, subject=None):
     style = STYLES["styles"][style_name]
+    if subject and layout not in ("stack-left", "bottom-left"):
+        raise SystemExit("--subject works with stack-left and bottom-left only")
+    if subject:
+        # backdrop: blurred + vertical tint when a frame exists, else solid bg
+        if frame:
+            im = background(style, frame, "center-big")
+        else:
+            im = Image.new("RGB", (W, H), hx(style["bg"]))
+        subj_w = paste_subject(im, subject, side="right")
+        text_w = W - subj_w - 2 * 72
+        LAYOUTS[layout](im, title, accent, style, label, lang, bool(frame), text_w)
+        return im
     im = split_background(style, frame, frame2) if layout == "split" else background(style, frame, layout)
     LAYOUTS[layout](im, title, accent, style, label, lang, bool(frame))
     return im
@@ -284,6 +325,8 @@ def main():
     ap.add_argument("--lang", default=None, choices=["en", "hi"])
     ap.add_argument("--frame", default=None)
     ap.add_argument("--frame2", default=None, help="second frame for --layout split")
+    ap.add_argument("--subject", default=None,
+                    help="RGBA cut-out PNG (from make_cutout.py) composited on the right with outline")
     ap.add_argument("--layout", default=None, choices=list(LAYOUTS))
     ap.add_argument("--mobile-preview", action="store_true",
                     help="also write a 380px-wide preview for phone-size readability check")
@@ -291,7 +334,7 @@ def main():
     args = ap.parse_args()
     spec = json.load(open(args.spec)) if args.spec else {}
     p = {k: getattr(args, k) if getattr(args, k) is not None else spec.get(k)
-         for k in ("title", "accent", "style", "label", "lang", "frame", "frame2", "layout")}
+         for k in ("title", "accent", "style", "label", "lang", "frame", "frame2", "layout", "subject")}
     p["style"] = p["style"] or "documentary"
     p["layout"] = p["layout"] or "bottom-left"
     p["lang"] = p["lang"] or ("hi" if p["title"] and any(ord(c) > 0x900 for c in p["title"]) else "en")
@@ -305,7 +348,7 @@ def main():
         ap.error(f"accent word '{p['accent']}' is not in the title; pick an exact title word")
     out = args.out or spec.get("out") or "thumbnail.jpg"
     im = render(p["title"], p["accent"], p["style"], p["label"], p["lang"],
-                p["frame"], p["layout"], p["frame2"])
+                p["frame"], p["layout"], p["frame2"], p.get("subject"))
     im.save(out, quality=92)
     p["out"] = out
     spec_path = os.path.splitext(out)[0] + ".spec.json"

@@ -46,7 +46,23 @@ python3 scripts/run_thumbnail.py --video video.mp4 \
 
 # 5. ground style choices in YOUR OWN private reference folder (stays local)
 python3 scripts/analyze_references.py /path/to/references --labels sources.csv
+
+# 6. (optional) character cut-out: host image tool puts the character on a flat
+#    uniform background, local keying removes it; compose with --subject
+python3 scripts/make_cutout.py shot.png --out subject.png
+python3 scripts/run_thumbnail.py --video video.mp4 \
+  --title "AI vs ARTISTS?" --accent "ARTISTS?" --subject subject.png \
+  --frame-time 330 --concept "why it fits" --refs REF1,REF2 \
+  --ref-notes "patterns" --out thumb.jpg
+
+# 7. 2-3 genuinely distinct concepts (different hook/frame/composition) in one run
+python3 scripts/run_thumbnail.py --video video.mp4 --concepts concepts.json --out set.jpg
 ```
+
+`--concepts` takes a JSON list where each entry has its own `title`, `accent`,
+optional `frame`, `style`, `layout`, `subject`, `reaction_edit` and `concept`
+note; it writes one file per entry plus one manifest for the set. Prefer this
+over `--variants`, which only rotates styles of the same text.
 
 ## Layouts (learned from real reference thumbnails)
 
@@ -69,8 +85,9 @@ applies, so the tool works for any channel out of the box.
 - `styles.json` - 5 colour combos (documentary, finance, tech, podcast, boldred) + font map
 - `profiles.json` - optional per-channel defaults
 - `scripts/extract_frames.py` - ffmpeg frame sampling + sharpness/colour scoring
-- `scripts/make_thumbnail.py` - deterministic renderer, 4 layouts, English + Hindi/Devanagari
-- `scripts/run_thumbnail.py` - variants + JSON run manifest
+- `scripts/make_thumbnail.py` - deterministic renderer, 4 layouts, English + Hindi/Devanagari, optional cut-out subject composition
+- `scripts/make_cutout.py` - local uniform-background keying -> transparent PNG subject
+- `scripts/run_thumbnail.py` - variants or distinct concept sets + JSON run manifest
 - `scripts/analyze_references.py` - pixel stats over a local reference folder
 - `fonts/` - 9 SIL OFL 1.1 fonts, each with its official OFL license text
 - `examples/` - sample renders on plain backgrounds

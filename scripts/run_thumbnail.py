@@ -57,8 +57,8 @@ def video_meta(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--video", required=True)
-    ap.add_argument("--title", required=True)
-    ap.add_argument("--accent", required=True)
+    ap.add_argument("--title")
+    ap.add_argument("--accent")
     ap.add_argument("--style", default=None, choices=list(STYLES["styles"]))
     ap.add_argument("--layout", default=None, choices=list(LAYOUTS))
     ap.add_argument("--profile", default=None, choices=list(PROFILES["profiles"]),
@@ -73,13 +73,20 @@ def main():
                     help="render N style/layout combos of the same text")
     ap.add_argument("--reaction-edit", default=None,
                     help="provenance note when the frame's character expression was edited by a host image tool")
-    ap.add_argument("--concept", required=True,
-                    help="why this visual + text fits this video")
+    ap.add_argument("--concept",
+                    help="why this visual + text fits this video (required for a single run)")
     ap.add_argument("--refs", default="", help="comma-separated reference IDs inspected")
     ap.add_argument("--ref-notes", default="", help="patterns observed in those references")
+    ap.add_argument("--concepts", default=None,
+                    help="JSON file: list of distinct concept specs (title, accent, style, layout, frame, frame_time, concept, label, lang, subject, reaction_edit) - renders each as its own thumbnail")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
+    if args.concepts:
+        run_concepts(args)
+        return
+    if not args.title or not args.accent or not args.concept:
+        ap.error("--title, --accent and --concept are required (unless --concepts is used)")
     prof = PROFILES["profiles"].get(args.profile or PROFILES["default_profile"], {})
     style = args.style or prof.get("style") or "documentary"
     layout = args.layout or prof.get("layout") or "bottom-left"
@@ -128,6 +135,58 @@ def main():
     mpath = base + ".manifest.json"
     json.dump(manifest, open(mpath, "w"), indent=2, ensure_ascii=False)
     print(json.dumps({"outputs": [o["file"] for o in outputs], "manifest": mpath}))
+
+def run_concepts(args):
+    """Render genuinely distinct concepts (different hook/frame/composition),
+    one manifest for the whole set."""
+    specs = json.load(open(args.concepts))
+    if not isinstance(specs, list) or not specs:
+        raise SystemExit("--concepts file must contain a non-empty JSON list")
+    prof = PROFILES["profiles"].get(args.profile or PROFILES["default_profile"], {})
+    base, ext = os.path.splitext(args.out)
+    lo, hi = STYLES["rules"]["title_words"]
+    entries = []
+    for i, c in enumerate(specs, 1):
+        title = c["title"]
+        accent = c.get("accent")
+        words = len(title.split())
+        if not lo <= words <= hi:
+            raise SystemExit(f"concept {i}: title has {words} words; rule requires {lo}-{hi}")
+        if accent and accent.upper() not in [w.upper() for w in title.split()]:
+            raise SystemExit(f"concept {i}: accent must be one of the title words")
+        style = c.get("style") or prof.get("style") or "documentary"
+        layout = c.get("layout") or prof.get("layout") or "bottom-left"
+        lang = c.get("lang") or prof.get("lang") or (
+            "hi" if any(ord(ch) > 0x900 for ch in title) else "en")
+        out_path = f"{base}-concept{i}{ext or '.jpg'}"
+        im = render(title, accent, style, c.get("label"), lang,
+                    c.get("frame"), layout, c.get("frame2"), c.get("subject"))
+        im.save(out_path, quality=92)
+        mb = os.path.getsize(out_path) / 1e6
+        entries.append({
+            "file": os.path.abspath(out_path), "style": style, "layout": layout,
+            "concept": c.get("concept"), "text": {"title": title, "accent_word": accent,
+                                                  "label": c.get("label"), "lang": lang},
+            "chosen_frame": ({"file": os.path.basename(c["frame"]),
+                              "at_seconds": c.get("frame_time")} if c.get("frame") else None),
+            "subject": os.path.basename(c["subject"]) if c.get("subject") else None,
+            "reaction_edit": ({"applied": True, "description": c["reaction_edit"]}
+                              if c.get("reaction_edit") else {"applied": False}),
+            "size_mb": round(mb, 2), "under_2mb": mb < 2})
+    manifest = {
+        "tool": "thumbnail-generator skill (portable package)",
+        "run_at": time.strftime("%Y-%m-%d %H:%M:%S %z"),
+        "input_video": video_meta(args.video),
+        "profile": args.profile or PROFILES["default_profile"],
+        "mode": "distinct-concepts",
+        "concepts": entries,
+        "dimensions": f"{W}x{H}",
+        "scope": "Frame extraction/scoring + deterministic render by package; video understanding, reference choice, concept and text are agent/creator judgments supplied as inputs.",
+    }
+    mpath = base + ".manifest.json"
+    json.dump(manifest, open(mpath, "w"), indent=2, ensure_ascii=False)
+    print(json.dumps({"outputs": [e["file"] for e in entries], "manifest": mpath}))
+
 
 if __name__ == "__main__":
     main()
