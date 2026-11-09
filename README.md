@@ -79,6 +79,12 @@ python3 scripts/match_references.py --tags /path/to/reference_tags.json \
 `--channel` keeps a per-channel design memory (outside the repo) and warns when
 a new render would repeat the channel's recent pattern - warnings, never blocks.
 
+Known issue: every render is recorded, including rejected iterations, so an
+iteration loop can pollute the channel history and trigger false repeat-pattern
+warnings. Until the record step moves to approved designs only, rebuild the
+channel history from delivered manifests (`design_memory.py --record`) before a
+final render.
+
 The gate is measurable checks only: dimensions, 2MB limit, text contrast at
 380px phone size, and pasted-cutout brightness when a cutout was used (known
 placement, not a face detector). Hook truthfulness, imagery-topic match and
