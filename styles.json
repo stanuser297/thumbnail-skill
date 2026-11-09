@@ -1,0 +1,47 @@
+{
+  "styles": {
+    "documentary": {
+      "label": "Documentary / dark hook",
+      "bg": "#101114", "text": "#FFFFFF", "accent": "#E63946",
+      "mood": "Dark mood, ek red accent word. Serious, mystery, history topics."
+    },
+    "finance": {
+      "label": "Finance / alert",
+      "bg": "#0B0B0B", "text": "#FFFFFF", "accent": "#FFD60A",
+      "mood": "Black bg, yellow accent - warning/alert feel. Money, scam, risk topics."
+    },
+    "tech": {
+      "label": "Tech / gaming",
+      "bg": "#1B1035", "text": "#FFFFFF", "accent": "#22D3EE",
+      "mood": "Neon cyan on deep purple. AI, tech, gaming, future topics."
+    },
+    "podcast": {
+      "label": "Podcast / light clean",
+      "bg": "#F5F0E6", "text": "#141414", "accent": "#E63946",
+      "mood": "Cream bg, black text, minimal. Interviews, podcasts, soft topics."
+    },
+    "boldred": {
+      "label": "Bold red (high energy)",
+      "bg": "#D7263D", "text": "#FFF3D6", "accent": "#141414",
+      "mood": "Full-bleed red, cream text. High energy, breaking, drama."
+    }
+  },
+  "fonts": {
+    "en_display": "Anton-Regular.ttf",
+    "en_display_alt": "ArchivoBlack-Regular.ttf",
+    "en_clean": "Poppins-Bold.ttf",
+    "hi_display": "Mukta-ExtraBold.ttf",
+    "hi_friendly": "Baloo2.ttf",
+    "hi_neutral": "Hind-Bold.ttf",
+    "hi_tech": "Rajdhani-Bold.ttf",
+    "hi_handwritten": "Kalam-Bold.ttf",
+    "hi_body": "NotoSansDevanagari.ttf"
+  },
+  "rules": {
+    "size": [1280, 720],
+    "max_file_mb": 2,
+    "title_words": [2, 4],
+    "accent_words_max": 1,
+    "min_title_px": 72
+  }
+}
