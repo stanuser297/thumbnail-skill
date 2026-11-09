@@ -74,16 +74,23 @@ def cover(frame, w, h):
     return im.crop((x, y, x + w, y + h))
 
 
-def background(style, frame):
+def background(style, frame, layout):
     if frame:
         im = cover(frame, W, H).filter(ImageFilter.GaussianBlur(1))
-        # Fade the photo toward the style bg: strong floor everywhere (so
-        # mid-frame text stays readable) deepening toward the bottom.
+        # Fade the photo toward the style bg. Text-left layouts (stack-left,
+        # bottom-left) darken mostly the LEFT/text side so a subject on the
+        # right keeps its brightness; other layouts deepen toward the bottom.
         overlay = Image.new("L", (W, H), 0)
         od = ImageDraw.Draw(overlay)
-        for yy in range(H):
-            base = 120 + int(115 * (yy / H) ** 1.2)
-            od.line([(0, yy), (W, yy)], fill=base)
+        if layout in ("stack-left", "bottom-left"):
+            for xx in range(W):
+                h = 1 - xx / W
+                base = 45 + int(190 * h ** 1.2)
+                od.line([(xx, 0), (xx, H)], fill=base)
+        else:
+            for yy in range(H):
+                base = 120 + int(115 * (yy / H) ** 1.2)
+                od.line([(0, yy), (W, yy)], fill=base)
         tint = Image.new("RGB", (W, H), hx(style["bg"]))
         return Image.composite(tint, im, overlay)
     return Image.new("RGB", (W, H), hx(style["bg"]))
@@ -262,7 +269,7 @@ LAYOUTS = {
 def render(title, accent, style_name, label=None, lang="en", frame=None,
            layout="bottom-left", frame2=None):
     style = STYLES["styles"][style_name]
-    im = split_background(style, frame, frame2) if layout == "split" else background(style, frame)
+    im = split_background(style, frame, frame2) if layout == "split" else background(style, frame, layout)
     LAYOUTS[layout](im, title, accent, style, label, lang, bool(frame))
     return im
 
