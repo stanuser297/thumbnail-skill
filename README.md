@@ -57,7 +57,16 @@ python3 scripts/run_thumbnail.py --video video.mp4 \
 
 # 7. 2-3 genuinely distinct concepts (different hook/frame/composition) in one run
 python3 scripts/run_thumbnail.py --video video.mp4 --concepts concepts.json --out set.jpg
+
+# 8. automatic quality gate (runs inside run_thumbnail.py too; results land in
+#    the manifest's quality_checks, exit 1 on FAIL)
+python3 scripts/check_thumbnail.py thumb.jpg --layout stack-left --subject subject.png
 ```
+
+The gate is measurable checks only: dimensions, 2MB limit, text contrast at
+380px phone size, and pasted-cutout brightness when a cutout was used (known
+placement, not a face detector). Hook truthfulness, imagery-topic match and
+style-mood fit stay a human/host review - SKILL.md lists that checklist.
 
 `--concepts` takes a JSON list where each entry has its own `title`, `accent`,
 optional `frame`, `style`, `layout`, `subject`, `reaction_edit` and `concept`
@@ -87,7 +96,8 @@ applies, so the tool works for any channel out of the box.
 - `scripts/extract_frames.py` - ffmpeg frame sampling + sharpness/colour scoring
 - `scripts/make_thumbnail.py` - deterministic renderer, 4 layouts, English + Hindi/Devanagari, optional cut-out subject composition
 - `scripts/make_cutout.py` - local uniform-background keying -> transparent PNG subject
-- `scripts/run_thumbnail.py` - variants or distinct concept sets + JSON run manifest
+- `scripts/run_thumbnail.py` - variants or distinct concept sets + JSON run manifest with automatic quality checks
+- `scripts/check_thumbnail.py` - local quality gate: size, 2MB limit, phone-size text contrast, cutout brightness
 - `scripts/analyze_references.py` - pixel stats over a local reference folder
 - `fonts/` - 9 SIL OFL 1.1 fonts, each with its official OFL license text
 - `examples/` - sample renders on plain backgrounds

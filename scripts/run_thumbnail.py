@@ -26,6 +26,7 @@ import argparse, hashlib, json, os, subprocess, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from make_thumbnail import render, STYLES, LAYOUTS, W, H
+from check_thumbnail import run_checks
 
 PROFILES = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "profiles.json")))
 
@@ -67,6 +68,8 @@ def main():
     ap.add_argument("--lang", default=None, choices=["en", "hi"])
     ap.add_argument("--frame", default=None)
     ap.add_argument("--frame2", default=None, help="second frame for split layout")
+    ap.add_argument("--subject", default=None,
+                    help="RGBA cut-out PNG (from make_cutout.py) composited on the right (stack-left/bottom-left)")
     ap.add_argument("--frame-time", type=float, default=None,
                     help="seconds into the video the frame was taken from")
     ap.add_argument("--variants", type=int, default=1,
@@ -107,11 +110,14 @@ def main():
     outputs = []
     for i, (st, ly) in enumerate(combos):
         out_path = args.out if len(combos) == 1 else f"{base}-v{i+1}{ext or '.jpg'}"
-        im = render(args.title, args.accent, st, args.label, lang, args.frame, ly, args.frame2)
+        im = render(args.title, args.accent, st, args.label, lang, args.frame, ly, args.frame2,
+                    args.subject)
         im.save(out_path, quality=92)
         mb = os.path.getsize(out_path) / 1e6
         outputs.append({"file": os.path.abspath(out_path), "style": st, "layout": ly,
-                        "size_mb": round(mb, 2), "under_2mb": mb < 2})
+                        "size_mb": round(mb, 2), "under_2mb": mb < 2,
+                        "quality_checks": run_checks(out_path, ly, args.subject)})
+        _report_checks(out_path, outputs[-1]["quality_checks"])
 
     manifest = {
         "tool": "thumbnail-generator skill (portable package)",
@@ -163,7 +169,9 @@ def run_concepts(args):
                     c.get("frame"), layout, c.get("frame2"), c.get("subject"))
         im.save(out_path, quality=92)
         mb = os.path.getsize(out_path) / 1e6
+        qchecks = run_checks(out_path, layout, c.get("subject"))
         entries.append({
+            "quality_checks": qchecks,
             "file": os.path.abspath(out_path), "style": style, "layout": layout,
             "concept": c.get("concept"), "text": {"title": title, "accent_word": accent,
                                                   "label": c.get("label"), "lang": lang},
@@ -173,6 +181,7 @@ def run_concepts(args):
             "reaction_edit": ({"applied": True, "description": c["reaction_edit"]}
                               if c.get("reaction_edit") else {"applied": False}),
             "size_mb": round(mb, 2), "under_2mb": mb < 2})
+        _report_checks(out_path, qchecks)
     manifest = {
         "tool": "thumbnail-generator skill (portable package)",
         "run_at": time.strftime("%Y-%m-%d %H:%M:%S %z"),
@@ -186,6 +195,16 @@ def run_concepts(args):
     mpath = base + ".manifest.json"
     json.dump(manifest, open(mpath, "w"), indent=2, ensure_ascii=False)
     print(json.dumps({"outputs": [e["file"] for e in entries], "manifest": mpath}))
+
+
+def _report_checks(path, checks):
+    """Surface automatic quality-check warnings/fails so the runner sees them
+    before showing the creator. Checks are measurable only; semantic review
+    (hook truthfulness, imagery-topic match, style-mood fit) stays with the host."""
+    for c in checks:
+        if c["status"] != "pass":
+            print(f"QUALITY {c['status'].upper()}: {os.path.basename(path)}: "
+                  f"{c['check']}: {c['detail']}")
 
 
 if __name__ == "__main__":

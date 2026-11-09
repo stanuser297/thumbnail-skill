@@ -115,15 +115,24 @@ def stroke_kw(im, style, size, framed):
     return {"stroke_width": max(2, size // 36), "stroke_fill": hx(style["bg"])}
 
 
+def subject_geometry(subject_path):
+    """Placed size of a cut-out subject at render time (shared with the
+    quality checker so it reads the same bounds the renderer used)."""
+    subj = Image.open(subject_path)
+    scale = (H * 0.92) / subj.height
+    if subj.width * scale > W * 0.5:
+        scale = (W * 0.5) / subj.width
+    sw, sh = round(subj.width * scale), round(subj.height * scale)
+    subj.close()
+    return sw, sh
+
+
 def paste_subject(im, subject_path, side="right"):
     """Composite a cut-out subject (RGBA PNG) with outline + drop shadow.
     Returns the width the subject occupies, so text can avoid it."""
     subj = Image.open(subject_path).convert("RGBA")
-    scale = (H * 0.92) / subj.height
-    if subj.width * scale > W * 0.5:
-        scale = (W * 0.5) / subj.width
-    subj = subj.resize((round(subj.width * scale), round(subj.height * scale)))
-    sw, sh = subj.size
+    sw, sh = subject_geometry(subject_path)
+    subj = subj.resize((sw, sh))
     x = W - sw - 24 if side == "right" else 24
     y = H - sh
     alpha = subj.split()[3]
