@@ -8,10 +8,18 @@ Scope note: this is frame selection, not video understanding. It finds
 visually strong stills. Choosing the moment that matches the video's message
 still needs the agent/creator who knows the video.
 
-Usage: python3 extract_frames.py VIDEO --out DIR [--count 12] [--every 20]
+Usage: python3 extract_frames.py VIDEO --out DIR [--count 12] [--every 20] [--scenes]
 Requires: ffmpeg on PATH, Pillow, numpy.
+
+--scenes: instead of even sampling, take frames at the strongest scene cuts
+(detected via ffmpeg scene scores). This shortlists moments where something
+changed on screen; it still cannot tell which moment MATTERS - the agent/
+creator picks that.
 """
 import argparse, json, os, subprocess, sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from video_brief import scene_cuts
 
 def grab_frames(video, out, every):
     os.makedirs(out, exist_ok=True)
@@ -39,13 +47,44 @@ def score(path):
             "brightness": round(bright, 1),
             "score": round((0.6 * sharp + 0.4 * colorful) * pen, 2)}
 
+def grab_scene_frames(video, out, thresh=0.25):
+    os.makedirs(out, exist_ok=True)
+    frames = []
+    for i, t in enumerate(scene_cuts(video, thresh)):
+        p = os.path.join(out, f"s_{i:04d}.jpg")
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", str(t), "-i", video,
+                        "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "4", p],
+                       check=True)
+        frames.append((p, t))
+    return frames
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("video")
     ap.add_argument("--out", required=True)
     ap.add_argument("--count", type=int, default=12)
     ap.add_argument("--every", type=int, default=20, help="seconds between samples")
+    ap.add_argument("--scenes", action="store_true",
+                    help="sample at strongest scene cuts instead of evenly")
     args = ap.parse_args()
+    if args.scenes:
+        pairs = grab_scene_frames(args.video, args.out)
+        rows = []
+        for p, t in pairs:
+            s = score(p)
+            s["file"] = os.path.basename(p)
+            s["at_seconds"] = t
+            rows.append(s)
+        rows.sort(key=lambda r: -r["score"])
+        keep = {r["file"] for r in rows[: args.count]}
+        for p, _ in pairs:
+            if os.path.basename(p) not in keep:
+                os.remove(p)
+        report = os.path.join(args.out, "report.json")
+        with open(report, "w") as f:
+            json.dump(rows[: args.count], f, indent=2)
+        print(json.dumps(rows[: args.count], indent=2))
+        return
     frames = grab_frames(args.video, args.out, args.every)
     if not frames:
         sys.exit("no frames extracted")

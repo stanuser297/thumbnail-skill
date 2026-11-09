@@ -1,0 +1,6 @@
+{
+  "_comment": "Schema example for match_references.py. A creator's REAL tags file stays private and outside this repo, next to their private reference folder. Tags are written by a host vision pass over the creator's own references (see SKILL.md).",
+  "EXAMPLE-001": {"topics": ["podcast", "money"], "mood": ["dramatic"], "composition": "two-person-split", "notes": "huge condensed uppercase stack, red highlight bar on one word"},
+  "EXAMPLE-002": {"topics": ["technology", "explainer"], "mood": ["dramatic", "curious"], "composition": "cutout-right-text-left", "notes": "shocked cutout, single cyan accent bar, dark graded bg"},
+  "EXAMPLE-003": {"topics": ["travel", "vlog"], "mood": ["calm", "aspirational"], "composition": "center-big", "notes": "destination name centre-frame over landscape"}
+}

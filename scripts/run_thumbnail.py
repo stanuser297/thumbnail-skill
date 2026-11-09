@@ -27,6 +27,8 @@ import argparse, hashlib, json, os, subprocess, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from make_thumbnail import render, STYLES, LAYOUTS, W, H
 from check_thumbnail import run_checks
+import design_memory
+from video_brief import hook_evidence
 
 PROFILES = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "profiles.json")))
 
@@ -82,6 +84,10 @@ def main():
     ap.add_argument("--ref-notes", default="", help="patterns observed in those references")
     ap.add_argument("--concepts", default=None,
                     help="JSON file: list of distinct concept specs (title, accent, style, layout, frame, frame_time, concept, label, lang, subject, reaction_edit) - renders each as its own thumbnail")
+    ap.add_argument("--brief", default=None,
+                    help="video_brief.py brief JSON: adds transcript hook-evidence per title to the manifest (evidence, not a truth verdict)")
+    ap.add_argument("--channel", default=None,
+                    help="channel name for design memory: warns on repeated recent patterns, then records this run (history kept outside the repo in .thumbnail-history/)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -115,9 +121,12 @@ def main():
         im.save(out_path, quality=92)
         mb = os.path.getsize(out_path) / 1e6
         outputs.append({"file": os.path.abspath(out_path), "style": st, "layout": ly,
+                        "subject": os.path.basename(args.subject) if args.subject else None,
                         "size_mb": round(mb, 2), "under_2mb": mb < 2,
                         "quality_checks": run_checks(out_path, ly, args.subject)})
         _report_checks(out_path, outputs[-1]["quality_checks"])
+        if args.brief:
+            outputs[-1]["hook_evidence"] = hook_evidence(args.brief, args.title)
 
     manifest = {
         "tool": "thumbnail-generator skill (portable package)",
@@ -138,8 +147,19 @@ def main():
         "dimensions": f"{W}x{H}",
         "scope": "Frame extraction/scoring + deterministic render by package; video understanding, reference choice, concept and text are agent/creator judgments supplied as inputs.",
     }
+    if args.channel:
+        manifest["design_memory"] = {"channel": args.channel, "warnings": [
+            {"file": o["file"],
+             "warnings": design_memory.check(args.channel, o["style"], o["layout"],
+                                             bool(args.subject), ".thumbnail-history")}
+            for o in outputs]}
+        for w in manifest["design_memory"]["warnings"]:
+            for msg in w["warnings"]:
+                print(f"DESIGN-MEMORY WARN: {os.path.basename(w['file'])}: {msg}")
     mpath = base + ".manifest.json"
     json.dump(manifest, open(mpath, "w"), indent=2, ensure_ascii=False)
+    if args.channel:
+        design_memory.record(mpath, args.channel, ".thumbnail-history")
     print(json.dumps({"outputs": [o["file"] for o in outputs], "manifest": mpath}))
 
 def run_concepts(args):
@@ -182,6 +202,8 @@ def run_concepts(args):
                               if c.get("reaction_edit") else {"applied": False}),
             "size_mb": round(mb, 2), "under_2mb": mb < 2})
         _report_checks(out_path, qchecks)
+        if args.brief:
+            entries[-1]["hook_evidence"] = hook_evidence(args.brief, title)
     manifest = {
         "tool": "thumbnail-generator skill (portable package)",
         "run_at": time.strftime("%Y-%m-%d %H:%M:%S %z"),
@@ -192,8 +214,19 @@ def run_concepts(args):
         "dimensions": f"{W}x{H}",
         "scope": "Frame extraction/scoring + deterministic render by package; video understanding, reference choice, concept and text are agent/creator judgments supplied as inputs.",
     }
+    if args.channel:
+        manifest["design_memory"] = {"channel": args.channel, "warnings": [
+            {"file": e["file"],
+             "warnings": design_memory.check(args.channel, e["style"], e["layout"],
+                                             bool(e.get("subject")), ".thumbnail-history")}
+            for e in entries]}
+        for w in manifest["design_memory"]["warnings"]:
+            for msg in w["warnings"]:
+                print(f"DESIGN-MEMORY WARN: {os.path.basename(w['file'])}: {msg}")
     mpath = base + ".manifest.json"
     json.dump(manifest, open(mpath, "w"), indent=2, ensure_ascii=False)
+    if args.channel:
+        design_memory.record(mpath, args.channel, ".thumbnail-history")
     print(json.dumps({"outputs": [e["file"] for e in entries], "manifest": mpath}))
 
 

@@ -61,7 +61,23 @@ python3 scripts/run_thumbnail.py --video video.mp4 --concepts concepts.json --ou
 # 8. automatic quality gate (runs inside run_thumbnail.py too; results land in
 #    the manifest's quality_checks, exit 1 on FAIL)
 python3 scripts/check_thumbnail.py thumb.jpg --layout stack-left --subject subject.png
+
+# 9. video brief + hook evidence (transcript terms + scene cuts; keyword
+#    overlap is evidence for the truthfulness review, not proof)
+python3 scripts/video_brief.py --video video.mp4 --transcript subs.srt --scenes --out brief.json
+python3 scripts/video_brief.py --brief brief.json --hook "AI vs ARTISTS?"
+python3 scripts/run_thumbnail.py --video video.mp4 --title "AI vs ARTISTS?" --accent "ARTISTS?" \
+  --frame-time 330 --concept "why it fits" --refs R1 --ref-notes "patterns" \
+  --brief brief.json --channel mychannel --out thumb.jpg
+
+# 10. scene-cut frame shortlist + reference matching over a PRIVATE tag file
+python3 scripts/extract_frames.py video.mp4 --out frames/ --scenes
+python3 scripts/match_references.py --tags /path/to/reference_tags.json \
+  --topic "technology,explainer" --mood "dramatic"
 ```
+
+`--channel` keeps a per-channel design memory (outside the repo) and warns when
+a new render would repeat the channel's recent pattern - warnings, never blocks.
 
 The gate is measurable checks only: dimensions, 2MB limit, text contrast at
 380px phone size, and pasted-cutout brightness when a cutout was used (known
@@ -96,8 +112,11 @@ applies, so the tool works for any channel out of the box.
 - `scripts/extract_frames.py` - ffmpeg frame sampling + sharpness/colour scoring
 - `scripts/make_thumbnail.py` - deterministic renderer, 4 layouts, English + Hindi/Devanagari, optional cut-out subject composition
 - `scripts/make_cutout.py` - local uniform-background keying -> transparent PNG subject
-- `scripts/run_thumbnail.py` - variants or distinct concept sets + JSON run manifest with automatic quality checks
+- `scripts/run_thumbnail.py` - variants or distinct concept sets + JSON run manifest with automatic quality checks, hook evidence and design memory
 - `scripts/check_thumbnail.py` - local quality gate: size, 2MB limit, phone-size text contrast, cutout brightness
+- `scripts/video_brief.py` - transcript terms + scene cuts into a brief JSON; hook-evidence lookup
+- `scripts/design_memory.py` - per-channel design history + repeat-pattern warnings
+- `scripts/match_references.py` - rank a private reference library by topic/mood tags (host-written, schema in examples/)
 - `scripts/analyze_references.py` - pixel stats over a local reference folder
 - `fonts/` - 9 SIL OFL 1.1 fonts, each with its official OFL license text
 - `examples/` - sample renders on plain backgrounds
