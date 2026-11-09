@@ -71,6 +71,8 @@ def main():
                     help="seconds into the video the frame was taken from")
     ap.add_argument("--variants", type=int, default=1,
                     help="render N style/layout combos of the same text")
+    ap.add_argument("--reaction-edit", default=None,
+                    help="provenance note when the frame's character expression was edited by a host image tool")
     ap.add_argument("--concept", required=True,
                     help="why this visual + text fits this video")
     ap.add_argument("--refs", default="", help="comma-separated reference IDs inspected")
@@ -114,6 +116,9 @@ def main():
         "concept": args.concept,
         "chosen_frame": ({"file": os.path.basename(args.frame),
                           "at_seconds": args.frame_time} if args.frame else None),
+        "reaction_edit": ({"applied": True, "description": args.reaction_edit,
+                           "note": "character expression edited by a host image-editing tool; identity preserved from the source frame"}
+                          if args.reaction_edit else {"applied": False}),
         "text": {"title": args.title, "accent_word": args.accent,
                  "label": args.label, "lang": lang},
         "variants": outputs,

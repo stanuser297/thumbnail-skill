@@ -9,7 +9,11 @@ developed and tested on Linux - other setups are not yet verified.
 The package supplies the style system, fonts, frame tools and renderer.
 A host agent (or the creator) supplies the judgment: what the video is about,
 which design references to follow, and the final text. The code does not
-understand video content by itself.
+understand video content by itself. When the host environment provides an
+image-editing model, the workflow can also edit the video character's
+expression for the thumbnail (identity preserved, edit recorded in the run
+manifest); the package itself embeds no image model and assumes no paid
+provider.
 
 ## Quick start
 
